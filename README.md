@@ -1,6 +1,6 @@
 # ASP
 
-### You have just found Audio Signal Processing (ASP).
+### You have just found Audio Signal Processing tools for Python (ASP).
 It covers a range of utilities for I/O handling and Time-Frequency Decompositions and soon enough audio source separation methods.
 Currently supported functionallity :
 - WAV/MP3/AAC Reading and Writing
