@@ -15,3 +15,7 @@ For code usage, please refer to each class. Examples are given inside method or 
 - SciPy version   '0.17.0' or later (Crucial for avoiding poor reconstruction for the complex PQMF)
 - cPickle version '1.71' or later
 - pyglet           For audio playback routines
+
+### Acknowledgements :
+The research leading to these results has received funding from the European Union's H2020 Framework Programme (H2020-MSCA-ITN-2014) under grant agreement no.642685 MacSeNet.
+
