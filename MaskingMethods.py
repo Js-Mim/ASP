@@ -23,8 +23,8 @@ class FrequencyMasking:
 		self._method = method
 		self._iterations = 200
 		self._lr = 3e-3#2e-3
-		self._hetaplus = 1.2
-		self._hetaminus = 0.5
+		self._hetaplus = 1.15
+		self._hetaminus = 0.25
 
 	def __call__(self, reverse = False):
 
