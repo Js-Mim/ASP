@@ -1,4 +1,5 @@
 # ASP
+[![DOI](https://zenodo.org/badge/94981060.svg)](https://zenodo.org/badge/latestdoi/94981060)
 
 ### You have just found Audio Signal Processing tools for Python (ASP).
 It covers a range of utilities for I/O handling and Time-Frequency Decompositions and soon enough audio source separation methods.
