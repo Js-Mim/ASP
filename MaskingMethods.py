@@ -22,9 +22,10 @@ class FrequencyMasking:
 		self._alpha = alpha
 		self._method = method
 		self._iterations = 200
-		self._lr = 3e-3#2e-3
-		self._hetaplus = 1.15
-		self._hetaminus = 0.25
+		self._lr = 1.5e-3#2e-3
+		self._hetaplus = 1.1
+		self._hetaminus = 0.1
+		self._amountiter = 0
 
 	def __call__(self, reverse = False):
 
@@ -281,6 +282,7 @@ class FrequencyMasking:
 
 		# Begin of otpimization
 		isloss = []
+		alphalog = []
 		for iter in xrange(self._iterations):
 			# The actual function of additive power spectrograms
 			Xhat = np.sum(np.power(slist, np.reshape(alpha, (numElements, 1, 1))), axis=0)
@@ -293,8 +295,12 @@ class FrequencyMasking:
 
 			alpha -= (lrs*dloss)
 
-			# Make sure the initial alpha are inside reasonable values
+			# Make sure the initial alpha are inside reasonable and comparable values
 			alpha = np.clip(alpha, a_min = 0.5, a_max = 2.)
+			alpha = np.round(alpha * 100.)/100.
+
+			# Store the evolution of alphas
+			alphalog.append(alpha)
 
 			# Check IS Loss by computing Xhat
 			Xhat = 0
@@ -302,8 +308,9 @@ class FrequencyMasking:
 				Xhat += slist[source, :, :] ** alpha[source]
 
 			isloss.append(self._IS(Xhat))
+
+			# Apply RProp
 			if (iter > 2):
-				# Apply RProp
 				if (isloss[-2] - isloss[-1] > 0):
 					lrs *= self._hetaplus
 
@@ -312,16 +319,37 @@ class FrequencyMasking:
 
 				if (iter > 4):
 					if (np.abs(isloss[-2] - isloss[-1]) < 1e-4 and np.abs(isloss[-3] - isloss[-2]) < 1e-4):
-						print('Local Minimum Found')
+						if (isloss[-1] > 3e-1):
+							print('Stuck...')
+							alpha = alphalog[np.argmin(isloss)-1]
+							isloss[-1] = isloss[np.argmin(isloss)]
+						else :
+							print('Local Minimum Found')
+
 						print('Final Loss: ' + str(isloss[-1]) + ' with characteristic exponent(s): ' + str(alpha))
 						break
 
 			print('Loss: ' + str(isloss[-1]) + ' with characteristic exponent(s): ' + str(alpha))
 
+		# If the operation was terminated by the end of iterations pick the minimum
+		if iter == self._iterations:
+			self._alpha = alphalog[np.argmin(isloss)]
+			self._closs = isloss[np.argmin(isloss)]
+		else :
+			self._closs = isloss[-1]
+			self._alpha = alpha
+
+		# Export the amount of iterations
+		self._amountiter = iter
+
 		# Evaluate Xhat for the mask update
-		self._mask = np.divide((slist[0, :, :] ** alpha[0] + self._eps), (self._mX ** self._alpha + self._eps))
-		self._closs = isloss[-1]
-		self._alpha = alpha
+		Xhat = 0
+		for source in xrange(numElements):
+			Xhat += slist[source, :, :] ** alpha[source]
+
+		self._mask = np.divide((slist[0, :, :] ** alpha[0] + self._eps), (Xhat + self._eps))
+
+
 
 	def MWF(self):
 		""" Multi-channel Wiener filtering as appears in:
