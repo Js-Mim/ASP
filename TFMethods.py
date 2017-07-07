@@ -2,12 +2,11 @@
 __author__ = 'S.I. Mimilakis'
 __copyright__ = 'MacSeNet'
 
-import math
+import math, sys
 import numpy as np
 from scipy.fftpack import fft, ifft, dct, dst
 from scipy.signal import firwin2, freqz, cosine, hanning, hamming, fftconvolve
 from scipy.interpolate import InterpolatedUnivariateSpline as uspline
-
 try :
     from QMF import qmf_realtime_class as qrf
 except ImportError :
