@@ -8,19 +8,12 @@
 __author__ = 'G. Schuller, S.I. Mimilakis'
 __copyright__ = "Fraunhofer IDMT, TU Ilmenau, MacSeNet"
 
+import sys
+from ASP import IOMethods as IO
 import numpy as np
-
-try :
-    import numpy.core._dotblas
-    print('Fast BLAS found!')
-except ImportError:
-    print('Slow BLAS will be used...')
-
+import cPickle as pickle
 import scipy.fftpack as spfft
 from scipy import io, sparse, signal
-import cPickle as pickle
-import IOMethods as IO
-
 
 # Utilities for Analysis
 def ha2Pa3d(ha, N = 1024):
@@ -420,7 +413,7 @@ def polyphase2x(xp):
 N = 1024
 
 # QMF Window
-qmfwin = np.loadtxt('QMF/qmf1024qn.mat').astype(np.float32)
+qmfwin = np.loadtxt('ASP/QMF/qmf1024qn.mat').astype(np.float32)
 qmfwin = np.hstack((qmfwin, qmfwin[::-1]))
 
 # Overlapped frames
