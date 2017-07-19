@@ -259,7 +259,7 @@ class FrequencyMasking:
 	def optAlpha(self, initloss):
 		"""
 			A simple gradiend descent method using the RProp algorithm,
-			for finding optimum power-spectral density exponents (alpha) for generalized wiener filtering.
+			for finding optimum power-spectral density exponents (alpha) for generalized Wiener filtering.
 		Args:
 			sTarget  : (2D ndarray) Magnitude Spectrogram of the target component
 			nResidual: (2D ndarray) Magnitude Spectrogram of the residual component or a list
@@ -348,8 +348,6 @@ class FrequencyMasking:
 			Xhat += slist[source, :, :] ** alpha[source]
 
 		self._mask = np.divide((slist[0, :, :] ** alpha[0] + self._eps), (Xhat + self._eps))
-
-
 
 	def MWF(self):
 		""" Multi-channel Wiener filtering as appears in:
