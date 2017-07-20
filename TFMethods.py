@@ -153,10 +153,10 @@ class TimeFrequencyDecomposition:
         """ LSEE-MSTFT algorithm for computing the synthesis window used in
         inverse STFT method below.
         Args:
-            wsz :   (int)    Synthesis Window size
+            wsz :   (int)    Synthesis window size
             hop :   (int)    Hop size
         Returns :
-            symw:   (array) Synthesised time-domain real signal.
+            symw:   (array)  Synthesised windowing function
 
         References :
             [1] Daniel W. Griffin and Jae S. Lim, ``Signal estimation from modified short-time
@@ -186,9 +186,9 @@ class TimeFrequencyDecomposition:
         """ Short Time Fourier Transform synthesis of given magnitude and phase spectra,
         via the above iDFT method.
         Args:
-            xmX :   (2D ndarray)  Magnitude Spectrum
-            xpX :   (2D ndarray)  Phase Spectrum
-            wsz :   (int)         Synthesis Window size
+            xmX :   (2D ndarray)  Magnitude spectrum
+            xpX :   (2D ndarray)  Phase spectrum
+            wsz :   (int)         Synthesis window size
             hop :   (int)         Hop size
             smt :   (bool)        Whether or not use a post-processing step in time domain
                                   signal recovery, using synthesis windows.
