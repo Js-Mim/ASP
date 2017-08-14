@@ -1156,9 +1156,9 @@ class PsychoacousticModel:
             xn      :   (ndarray) 1D Array containing the true time domain signal.
             xnhat   :   (ndarray) 1D Array containing the estimated time domain signal.
         Returns     :
-            NMR     :   (float)   A measurement in dB providing an indication of how close
+            NMR     :   (float)   A measurement providing an indication of how close
                                   the errors are to the masking threshold. The average through
-                                  time is computed. Values less than 0 dB indicate imperceptiple
+                                  time is computed. Values less than 0 indicate imperceptiple
                                   differences.
         Based on :
         - K. Brandenburg and T. Sporer,  “NMR and Masking Flag: Evaluation of Quality Using Perceptual Criteria,” in
