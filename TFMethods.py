@@ -1182,7 +1182,7 @@ class PsychoacousticModel:
         imT = 1./(mT + 1e-12)
 
         # NMR computation
-        NMR = np.log10(1./mX.shape[0] * np.sum(np.sum(imT * Err, axis = -1) + 1e-12))
+        NMR = np.log(1./mX.shape[0] * np.sum(np.sum(imT * Err, axis = -1) + 1e-12))
 
         print(NMR)
         return NMR
