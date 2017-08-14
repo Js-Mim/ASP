@@ -767,9 +767,13 @@ class CepstralDecomposition:
 
 class PsychoacousticModel:
     """ Class that performs a very basic psychoacoustic model.
-        Bark scaling is based on Perceptual-Coding-In-Python, [Online] :
+        - Bark scaling is based on Perceptual-Coding-In-Python, [Online] :
         https://github.com/stephencwelch/Perceptual-Coding-In-Python
+        - Perceptual filters and correction based on :
+        A. Härmä, and K. Palomäki, ''HUTear – a free Matlab toolbox for modeling of human hearing'',
+        in Proceedings of the Matlab DSP Conference, pp 96-99, Espoo, Finland 1999.
     """
+
     def __init__(self, N = 4096, fs = 44100, nfilts=24, type = 'rasta', width = 1.0, minfreq=0, maxfreq=22050):
 
         self.nfft = N
@@ -782,6 +786,14 @@ class PsychoacousticModel:
         self.nfreqs = N/2
         self._LTeq = np.zeros(nfilts, dtype = np.float32)
 
+        # Non-linear superposition parameters
+        self._alpha = 0.9                                       # Exponent alpha
+        self._maxb = 1./self.nfilts                             # Bark-band normalization
+        self._fa = 1./(10 ** (14.5/20.) * 10 ** (12./20.))      # Tone masking approximation
+        self._fb = 1./(10**(7.5/20.))                           # Upper slope of spreading function
+        self._fbb = 1./(10**(26./20.))                          # Lower slope of spreading function
+        self._fd = 1./self._alpha                               # One over alpha exponent
+
         # Type of transformation
         self.type = type
 
@@ -790,14 +802,6 @@ class PsychoacousticModel:
 
         # Computing the inverse matrix for backward Bark transformation
         self.W_inv = self.bark2mX()
-
-        # Non-linear superposition parameters
-        self._alpha = 0.9                                       # Exponent alpha
-        self._maxb = 1./self.nfilts                             # Bark-band normalization
-        self._fa = 1./(10 ** (14.5/20.) * 10 ** (12./20.))      # Tone masking approximation
-        self._fb = 1./(10**(7.5/20.))                           # Upper slope of spreading function
-        self._fbb = 1./(10**(26./20.))                          # Lower slope of spreading function
-        self._fd = 1./self._alpha                               # One over alpha exponent
 
     def mX2Bark(self, type):
         """ Method to perform the transofrmation.
@@ -885,8 +889,8 @@ class PsychoacousticModel:
         Returns  :
             W    : (ndarray)    The inverse transformation matrix.
         """
-        W_inv= np.dot(np.diag((1.0/np.sum(self.W,1))**0.5), self.W[:,0:self.nfreqs + 1]).T
-
+        W_inv= np.dot(np.diag((1.0/np.sum(self.W[:,0:self.nfreqs + 1], 1)) ** 0.5),
+                      self.W[:,0:self.nfreqs + 1]).T
         return W_inv
 
     def hz2bark(self, f):
@@ -1088,7 +1092,7 @@ class PsychoacousticModel:
         B = 1
         _, LTq = freqz(A, B, firOrd, self.fs)
 
-        LTq = 20. * np.log10(np.abs(LTq))
+        LTq = 20. * np.log10(np.abs(LTq) + 1e-6)
         LTq -= max(LTq)
         return LTq[:self.nfft/2 + 1]
 
@@ -1147,21 +1151,26 @@ class PsychoacousticModel:
         return maskingThreshold
 
     def NMREval(self, xn, xnhat):
-        """ Method to perform NMR perceptual evaluation of audio quality between two signals.
+        """ Method to perform NMR-based evaluation of audio quality between two signals.
         Args        :
             xn      :   (ndarray) 1D Array containing the true time domain signal.
             xnhat   :   (ndarray) 1D Array containing the estimated time domain signal.
         Returns     :
-            NMR     :   (float)   A float measurement in dB providing a perceptually weighted
-                        evaluation. Below -9 dB can be considered as in-audible difference/error.
-        As appears in :
+            NMR     :   (float)   A measurement in dB providing an indication of how close
+                                  the errors are to the masking threshold. The average through
+                                  time is computed. Values less than 0 dB indicate imperceptiple
+                                  differences.
+        Based on :
         - K. Brandenburg and T. Sporer,  “NMR and Masking Flag: Evaluation of Quality Using Perceptual Criteria,” in
-        Proceedings of the AES 11th International Conference on Test and Measurement, Portland, USA, May 1992, pp. 169–179
-        - J. Nikunen and T. Virtanen, "Noise-to-mask ratio minimization by weighted non-negative matrix factorization," in
-         Acoustics Speech and Signal Processing (ICASSP), 2010 IEEE International Conference on, Dallas, TX, 2010, pp. 25-28.
+        Proceedings of the AES 11th International Conference on Test and Measurement, Portland, USA, May 1992, pp. 169–179.
         """
+
         mX, _ = TimeFrequencyDecomposition.STFT(xn, hanning(self.nfft/2 + 1), self.nfft, self.nfft/4)
         mXhat, _ = TimeFrequencyDecomposition.STFT(xnhat, hanning(self.nfft/2 + 1), self.nfft, self.nfft/4)
+
+        # Remove zero-padded frames
+        mX = mX[3:-3, :]
+        mXhat = mXhat[3:-3, :]
 
         # Compute Error
         Err = np.abs(mX - mXhat) ** 2.
@@ -1170,13 +1179,11 @@ class PsychoacousticModel:
         mT = self.maskingThreshold(mX)
 
         # Inverse the filter of masking threshold
-        imT = 1./(mT + eps)
-
-        # Outer/Middle Ear transfer function on the diagonal
-        LTq = 10 ** (self.MOEar()/20.)
+        imT = 1./(mT + 1e-12)
 
         # NMR computation
-        NMR = 10. * np.log10((1./mX.shape[0]) * self._maxb * np.sum((imT * (Err*LTq))))
+        NMR = np.log10(1./mX.shape[0] * np.sum(np.sum(imT * Err, axis = -1) + 1e-12))
+
         print(NMR)
         return NMR
 
@@ -1290,8 +1297,10 @@ if __name__ == "__main__":
 
     # Test
     #kSin = np.cos(np.arange(88200) * (1000.0 * (3.1415926 * 2.0) / 44100)) * 0.5
-    mix, fs = IO.AudioIO.wavRead('testFiles/supreme_test.wav', mono = True)
-    mix = mix[:15*fs]
+    mix, fs = IO.AudioIO.wavRead('../testFiles/supreme_test.wav', mono = True)
+
+    seg = 2
+    mix = mix[seg*30*fs:(seg+1)*30*fs]
     #mix = mix[44100*25:44100*25 + 882000] * 0.25
     # Approximate unity over the average magnitude of noise
     noise = np.random.uniform(-50., 50., len(mix))
@@ -1315,6 +1324,10 @@ if __name__ == "__main__":
     sound = TimeFrequencyDecomposition.iSTFT(magX, phsX, 2048, 512)
     noise = TimeFrequencyDecomposition.iSTFT(magN * mt, phsN, 2048, 512)
 
+    magX[:, 512:] *= 0.
+    soundB = TimeFrequencyDecomposition.iSTFT(magX, phsX, 2048, 512)
     # Test the NMR Function
-    #NMR = pm.NMREval(sound, sound+noise)
+    NMR = pm.NMREval(sound, (sound+noise*1.))
+    NMR = pm.NMREval(sound, (sound+noise*2.))
+    NMR = pm.NMREval(sound, soundB)
     #IO.AudioIO.wavWrite(sound + noise, fs, 16, 'sound2.wav')
