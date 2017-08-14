@@ -28,7 +28,7 @@ x *= 0.1
 #x = np.cos(np.arange(88200) * (1000.0 * (3.1415926 * 2.0) / 44100)) * 0.1
 #fs = 44100
 # Generate noise. Scaling was found experimentally to perfectly match the masking threshold magnitude.
-noise = np.random.uniform(-30., 30., (len(x), 1))
+noise = np.random.uniform(-50., 50., (len(x), 1))
 
 # STFT/iSTFT Test
 w = np.bartlett(wsz)
@@ -36,7 +36,7 @@ w = np.bartlett(wsz)
 w = w / sum(w)
 
 # Initialize psychoacoustic mode
-pm = TF.PsychoacousticModel(N = N, fs = fs, nfilts = 60)
+pm = TF.PsychoacousticModel(N = N, fs = fs, nfilts = 24)
 
 # Visual stuff
 option = 'pygame'
