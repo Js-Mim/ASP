@@ -125,7 +125,7 @@ class TimeFrequencyDecomposition:
 
         # Normalise windowing function
         if np.sum(w)!= 0. :
-            w = w / np.sum(w) #w = w / np.sqrt(np.sum(w**2.))
+            w = w / np.sum(w)
 
         # Initialize storing matrix
         xmX = np.zeros((len(x)/hop, N/2 + 1), dtype = np.float32)
@@ -789,7 +789,7 @@ class PsychoacousticModel:
         # Non-linear superposition parameters
         self._alpha = 0.9                                       # Exponent alpha
         self._maxb = 1./self.nfilts                             # Bark-band normalization
-        self._fa = 1./(10 ** (14.5/20.) * 10 ** (12.5/20.))      # Tone masking approximation
+        self._fa = 1./(10 ** (14.5/20.) * 10 ** (12.5/20.))     # Tone masking approximation
         self._fb = 1./(10**(7.5/20.))                           # Upper slope of spreading function
         self._fbb = 1./(10**(26./20.))                          # Lower slope of spreading function
         self._fd = 1./self._alpha                               # One over alpha exponent
@@ -1316,6 +1316,7 @@ if __name__ == "__main__":
     # Initialize the model
     pm = PsychoacousticModel(N = 2048, fs = 44100, nfilts = 32)
 
+    # PQMF demo-usage
     #pX = TimeFrequencyDecomposition.pqmf_analysis(mix)
     # Acquire the response
     #LTeq = 10 ** (pm.MOEar()/20.)
