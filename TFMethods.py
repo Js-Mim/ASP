@@ -2,7 +2,7 @@
 __author__ = 'S.I. Mimilakis'
 __copyright__ = 'MacSeNet'
 
-import math, sys
+import math, sys, os
 import numpy as np
 from scipy.fftpack import fft, ifft, dct, dst
 from scipy.signal import firwin2, freqz, cosine, hanning, hamming, fftconvolve
@@ -125,7 +125,7 @@ class TimeFrequencyDecomposition:
 
         # Normalise windowing function
         if np.sum(w)!= 0. :
-            w = w / np.sum(w)
+            w = w / np.sum(w) #w = w / np.sqrt(np.sum(w**2.))
 
         # Initialize storing matrix
         xmX = np.zeros((len(x)/hop, N/2 + 1), dtype = np.float32)
@@ -789,7 +789,7 @@ class PsychoacousticModel:
         # Non-linear superposition parameters
         self._alpha = 0.9                                       # Exponent alpha
         self._maxb = 1./self.nfilts                             # Bark-band normalization
-        self._fa = 1./(10 ** (14.5/20.) * 10 ** (12./20.))      # Tone masking approximation
+        self._fa = 1./(10 ** (14.5/20.) * 10 ** (12.5/20.))      # Tone masking approximation
         self._fb = 1./(10**(7.5/20.))                           # Upper slope of spreading function
         self._fbb = 1./(10**(26./20.))                          # Lower slope of spreading function
         self._fd = 1./self._alpha                               # One over alpha exponent
@@ -890,7 +890,7 @@ class PsychoacousticModel:
             W    : (ndarray)    The inverse transformation matrix.
         """
         W_inv= np.dot(np.diag((1.0/np.sum(self.W[:,0:self.nfreqs + 1], 1)) ** 0.5),
-                      self.W[:,0:self.nfreqs + 1]).T
+                      self.W[:, 0:self.nfreqs + 1]).T
         return W_inv
 
     def hz2bark(self, f):
@@ -1169,8 +1169,8 @@ class PsychoacousticModel:
         mXhat, _ = TimeFrequencyDecomposition.STFT(xnhat, hanning(self.nfft/2 + 1), self.nfft, self.nfft/4)
 
         # Remove zero-padded frames
-        mX = mX[3:-3, :]
-        mXhat = mXhat[3:-3, :]
+        mX = mX[4:-4, :]
+        mXhat = mXhat[4:-4, :]
 
         # Compute Error
         Err = np.abs(mX - mXhat) ** 2.
@@ -1179,10 +1179,10 @@ class PsychoacousticModel:
         mT = self.maskingThreshold(mX)
 
         # Inverse the filter of masking threshold
-        imT = 1./(mT + 1e-12)
+        imT = (1./(mT + 1e-12)) ** 2.
 
         # NMR computation
-        NMR = np.log(1./mX.shape[0] * np.sum(np.sum(imT * Err, axis = -1) + 1e-12))
+        NMR = (10. * np.log10(np.mean(np.mean(imT * Err, axis = -1) + 1e-12)))
 
         print(NMR)
         return NMR
@@ -1297,24 +1297,26 @@ if __name__ == "__main__":
 
     # Test
     #kSin = np.cos(np.arange(88200) * (1000.0 * (3.1415926 * 2.0) / 44100)) * 0.5
-    mix, fs = IO.AudioIO.wavRead('../testFiles/supreme_test.wav', mono = True)
+    print(os.path.join(os.path.dirname(__file__)))
+    mix, fs = IO.AudioIO.wavRead(os.path.join(os.path.dirname(__file__), '../testFiles/supreme_test.wav'), mono = True)
 
-    seg = 2
+    seg = 9
     mix = mix[seg*30*fs:(seg+1)*30*fs]
     #mix = mix[44100*25:44100*25 + 882000] * 0.25
     # Approximate unity over the average magnitude of noise
-    noise = np.random.uniform(-50., 50., len(mix))
+    #noise = np.random.uniform(-50., 50., len(mix))
 
     # STFT/iSTFT Test
     w = np.hanning(1025)
     magX, phsX =  TimeFrequencyDecomposition.STFT(mix, w, 2048, 512)
-    magN, phsN =  TimeFrequencyDecomposition.STFT(noise, w, 2048, 512)
+    #magN, phsN =  TimeFrequencyDecomposition.STFT(noise, w, 2048, 512)
+    magN = np.random.normal(1.,0.005,(magX.shape[0], magX.shape[1]))
 
     # Usage of psychoacoustic model
     # Initialize the model
-    pm = PsychoacousticModel(N = 2048, fs = 44100, nfilts = 24)
+    pm = PsychoacousticModel(N = 2048, fs = 44100, nfilts = 32)
 
-    #magX = TimeFrequencyDecomposition.pqmf_analysis(mix)
+    #pX = TimeFrequencyDecomposition.pqmf_analysis(mix)
     # Acquire the response
     #LTeq = 10 ** (pm.MOEar()/20.)
     # Compute masking threshold
@@ -1322,12 +1324,12 @@ if __name__ == "__main__":
 
     # STFT/iSTFT Test
     sound = TimeFrequencyDecomposition.iSTFT(magX, phsX, 2048, 512)
-    noise = TimeFrequencyDecomposition.iSTFT(magN * mt, phsN, 2048, 512)
-
-    magX[:, 512:] *= 0.
+    noise = TimeFrequencyDecomposition.iSTFT(magN * mt, phsX, 2048, 512)
+    magX[:, 511:] *= 0.
     soundB = TimeFrequencyDecomposition.iSTFT(magX, phsX, 2048, 512)
+
     # Test the NMR Function
-    NMR = pm.NMREval(sound, (sound+noise*1.))
-    NMR = pm.NMREval(sound, (sound+noise*2.))
+    NMR = pm.NMREval(sound, sound + noise)
+    NMR = pm.NMREval(sound, sound + (noise * 2.))
     NMR = pm.NMREval(sound, soundB)
     #IO.AudioIO.wavWrite(sound + noise, fs, 16, 'sound2.wav')
