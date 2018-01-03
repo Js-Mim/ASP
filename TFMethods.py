@@ -7,12 +7,13 @@ import numpy as np
 from scipy.fftpack import fft, ifft, dct, dst
 from scipy.signal import firwin2, freqz, cosine, hanning, hamming, fftconvolve
 from scipy.interpolate import InterpolatedUnivariateSpline as uspline
-try :
+try:
     from QMF import qmf_realtime_class as qrf
-except ImportError :
+except ImportError:
     print('PQMF class was not found. ')
 
 eps = np.finfo(np.float32).tiny
+
 
 class TimeFrequencyDecomposition:
     """ A Class that performs time-frequency decompositions by means of a
@@ -70,17 +71,15 @@ class TimeFrequencyDecomposition:
         """
 
         # Get FFT Size
-        hlfN = magX.size;
+        hlfN = magX.size
         N = (hlfN-1)*2
 
         # Half of window size parameters
         hw1 = int(math.floor((wsz+1)/2))
         hw2 = int(math.floor(wsz/2))
 
-        # Initialise synthesis buffer with zeros
-        fftbuffer = np.zeros(N)
         # Initialise output spectrum with zeros
-        Y = np.zeros(N, dtype = complex)
+        Y = np.zeros(N, dtype=complex)
         # Initialise output array with zeros
         y = np.zeros(wsz)
 
@@ -115,7 +114,7 @@ class TimeFrequencyDecomposition:
         wsz = w.size
 
         # Add some zeros at the start and end of the signal to avoid window smearing
-        x = np.append(np.zeros(3*hop),x)
+        x = np.append(np.zeros(3*hop), x)
         x = np.append(x, np.zeros(3*hop))
 
         # Initialize sound pointers
@@ -124,12 +123,12 @@ class TimeFrequencyDecomposition:
         indx = 0
 
         # Normalise windowing function
-        if np.sum(w)!= 0. :
-            w = w / np.sum(w)
+        if np.sum(w) != 0.:
+            w *= 1./np.sqrt(N)
 
         # Initialize storing matrix
-        xmX = np.zeros((len(x)/hop, N/2 + 1), dtype = np.float32)
-        xpX = np.zeros((len(x)/hop, N/2 + 1), dtype = np.float32)
+        xmX = np.zeros((len(x)/hop, N/2 + 1), dtype=np.float32)
+        xpX = np.zeros((len(x)/hop, N/2 + 1), dtype=np.float32)
 
         # Analysis Loop
         while pin <= pend:
@@ -149,12 +148,13 @@ class TimeFrequencyDecomposition:
         return xmX, xpX
 
     @staticmethod
-    def GLA(wsz, hop):
+    def GLA(wsz, hop, N=4096):
         """ LSEE-MSTFT algorithm for computing the synthesis window used in
         inverse STFT method below.
         Args:
             wsz :   (int)    Synthesis window size
             hop :   (int)    Hop size
+            N   :   (int)    DFT Size
         Returns :
             symw:   (array)  Synthesised windowing function
 
@@ -163,7 +163,7 @@ class TimeFrequencyDecomposition:
             Fourier transform,'' IEEE Transactions on Acoustics, Speech and Signal Processing,
             vol. 32, no. 2, pp. 236-243, Apr 1984.
         """
-        synw = hamming(wsz)/np.sum(hamming(wsz))
+        synw = hamming(wsz)/np.sqrt(N)
         synwProd = synw ** 2.
         synwProd.shape = (wsz, 1)
         redundancy = wsz/hop
@@ -182,7 +182,7 @@ class TimeFrequencyDecomposition:
         return synw
 
     @staticmethod
-    def iSTFT(xmX, xpX, wsz, hop, smt = False) :
+    def iSTFT(xmX, xpX, wsz, hop, smt=False):
         """ Short Time Fourier Transform synthesis of given magnitude and phase spectra,
         via the above iDFT method.
         Args:
@@ -198,9 +198,9 @@ class TimeFrequencyDecomposition:
 
         # GL-Algorithm or simple OLA
         if smt == True:
-            rs = TimeFrequencyDecomposition.GLA(wsz, hop)
-        else :
-            rs = hop
+            rs = TimeFrequencyDecomposition.GLA(wsz, hop, (wsz - 1)*2.)
+        else:
+            rs = np.sqrt(2. * (wsz-1))
 
         # Acquire half window sizes
         hw1 = int(math.floor((wsz+1)/2))
@@ -267,7 +267,7 @@ class TimeFrequencyDecomposition:
         return smX, spX
 
     @staticmethod
-    def MCiSTFT(xmX, xpX, wsz, hop, smt = False):
+    def MCiSTFT(xmX, xpX, wsz, hop, smt=False):
         """ Short Time Fourier Transform synthesis of given magnitude and phase spectra
         over multiple channels.
         Args:
@@ -287,7 +287,7 @@ class TimeFrequencyDecomposition:
 
         # Synthesize the first incoming channel to acquire the dimensions
         y = TimeFrequencyDecomposition.iSTFT(xmX[0, :, :].T, xpX[0, :, :].T, wsz, hop, smt)
-        yout = np.zeros((len(y), M), dtype = np.float32)
+        yout = np.zeros((len(y), M), dtype=np.float32)
         # Storing it to the actual return and free up some memory
         yout[:, 0] = y
         del y
@@ -720,6 +720,7 @@ class TimeFrequencyDecomposition:
 
         return y
 
+
 class CepstralDecomposition:
     """ A Class that performs a cepstral decomposition based on the
         logarithmic observed magnitude spectrogram. As appears in:
@@ -727,7 +728,7 @@ class CepstralDecomposition:
         Sound Sources in Polyphonic Mixtures", Z.Duan, B.Pardo, L. Daudet.
     """
     @staticmethod
-    def computeUDCcoefficients(freqPoints = 2049, points = 2049, fs = 44100, melOption = False):
+    def computeUDCcoefficients(freqPoints=2049, points=2049, fs=44100, melOption=False):
         """ Computation of M matrix that contains the coefficients for
         cepstral modelling architecture.
         Args:
@@ -765,6 +766,7 @@ class CepstralDecomposition:
 
         return M
 
+
 class PsychoacousticModel:
     """ Class that performs a very basic psychoacoustic model.
         - Bark scaling is based on Perceptual-Coding-In-Python, [Online] :
@@ -774,7 +776,7 @@ class PsychoacousticModel:
         in Proceedings of the Matlab DSP Conference, pp 96-99, Espoo, Finland 1999.
     """
 
-    def __init__(self, N = 4096, fs = 44100, nfilts=24, type = 'rasta', width = 1.0, minfreq=0, maxfreq=22050):
+    def __init__(self, N=4096, fs=44100, nfilts=24, type='rasta', width=1.0, minfreq=0, maxfreq=22050):
 
         self.nfft = N
         self.fs = fs
@@ -818,7 +820,6 @@ class PsychoacousticModel:
             W = self.fft2bark_peaq()
         else:
             assert('Unknown method')
-
         return W
 
     def fft2bark_peaq(self):
@@ -842,7 +843,7 @@ class PsychoacousticModel:
         for k in range(nfft/2+1):
             for i in range(nfilts):
                 temp = (np.amin([fu[i], (k+0.5)*df]) - np.amax([fl[i], (k-0.5)*df])) / df
-                W[i,k] = np.amax([0, temp])
+                W[i, k] = np.amax([0, temp])
 
         return W
 
@@ -877,10 +878,10 @@ class PsychoacousticModel:
 
             # Compute the absolute threshold
             self._LTeq[i] = 3.64 * (self.bark2hz(f_bark_mid + 1) / 1000.) ** -0.8 - \
-            6.5*np.exp( -0.6 * (self.bark2hz(f_bark_mid + 1) / 1000. - 3.3) ** 2.) + \
+                       6.5*np.exp(-0.6 * (self.bark2hz(f_bark_mid + 1) / 1000. - 3.3) ** 2.) + \
                        1e-3*((self.bark2hz(f_bark_mid + 1) / 1000.) ** 4.)
 
-            W[i,0:(nfft/2)+1] = (np.round(binbarks/step_barks)== i)
+            W[i, 0:(nfft/2)+1] = (np.round(binbarks/step_barks) == i)
 
         return W
 
@@ -889,7 +890,7 @@ class PsychoacousticModel:
         Returns  :
             W    : (ndarray)    The inverse transformation matrix.
         """
-        W_inv= np.dot(np.diag((1.0/np.sum(self.W[:,0:self.nfreqs + 1], 1)) ** 0.5),
+        W_inv= np.dot(np.diag((1.0/np.sum(self.W[:, 0:self.nfreqs + 1], 1)) ** 0.5),
                       self.W[:, 0:self.nfreqs + 1]).T
         return W_inv
 
@@ -900,9 +901,7 @@ class PsychoacousticModel:
         Returns  :
             Brk  : (ndarray)    Array containing Bark scaled values.
         """
-        Brk = 6. * np.arcsinh(f/600.) # Method from RASTA model and computable inverse function.
-        #Brk = 13. * np.arctan(0.76*f/1000.) + 3.5 * np.arctan(f / (1000 * 7.5)) ** 2.
-
+        Brk = 6. * np.arcsinh(f/600.)  # Method from RASTA model for computable inverse function.
         return Brk
 
     def bark2hz(self, Brk):
@@ -924,74 +923,74 @@ class PsychoacousticModel:
                                        of the transformation matrix.
         """
 
-        fl = np.array([  80.000,   103.445,   127.023,   150.762,   174.694, \
-               198.849,   223.257,   247.950,   272.959,   298.317, \
-               324.055,   350.207,   376.805,   403.884,   431.478, \
-               459.622,   488.353,   517.707,   547.721,   578.434, \
-               609.885,   642.114,   675.161,   709.071,   743.884, \
-               779.647,   816.404,   854.203,   893.091,   933.119, \
-               974.336,  1016.797,  1060.555,  1105.666,  1152.187, \
-              1200.178,  1249.700,  1300.816,  1353.592,  1408.094, \
-              1464.392,  1522.559,  1582.668,  1644.795,  1709.021, \
-              1775.427,  1844.098,  1915.121,  1988.587,  2064.590, \
-              2143.227,  2224.597,  2308.806,  2395.959,  2486.169, \
-              2579.551,  2676.223,  2776.309,  2879.937,  2987.238, \
-              3098.350,  3213.415,  3332.579,  3455.993,  3583.817, \
-              3716.212,  3853.817,  3995.399,  4142.547,  4294.979, \
-              4452.890,  4616.482,  4785.962,  4961.548,  5143.463, \
-              5331.939,  5527.217,  5729.545,  5939.183,  6156.396, \
-              6381.463,  6614.671,  6856.316,  7106.708,  7366.166, \
-              7635.020,  7913.614,  8202.302,  8501.454,  8811.450, \
-              9132.688,  9465.574,  9810.536, 10168.013, 10538.460, \
-             10922.351, 11320.175, 11732.438, 12159.670, 12602.412, \
-             13061.229, 13536.710, 14029.458, 14540.103, 15069.295, \
-             15617.710, 16186.049, 16775.035, 17385.420 ])
+        fl = np.array([80.000,   103.445,   127.023,   150.762,   174.694,
+                       198.849,   223.257,   247.950,   272.959,   298.317,
+                       324.055,   350.207,   376.805,   403.884,   431.478,
+                       459.622,   488.353,   517.707,   547.721,   578.434,
+                       609.885,   642.114,   675.161,   709.071,   743.884,
+                       779.647,   816.404,   854.203,   893.091,   933.119,
+                       974.336,  1016.797,  1060.555,  1105.666,  1152.187,
+                      1200.178,  1249.700,  1300.816,  1353.592,  1408.094,
+                      1464.392,  1522.559,  1582.668,  1644.795,  1709.021,
+                      1775.427,  1844.098,  1915.121,  1988.587,  2064.590,
+                      2143.227,  2224.597,  2308.806,  2395.959,  2486.169,
+                      2579.551,  2676.223,  2776.309,  2879.937,  2987.238,
+                      3098.350,  3213.415,  3332.579,  3455.993,  3583.817,
+                      3716.212,  3853.817,  3995.399,  4142.547,  4294.979,
+                      4452.890,  4616.482,  4785.962,  4961.548,  5143.463,
+                      5331.939,  5527.217,  5729.545,  5939.183,  6156.396,
+                      6381.463,  6614.671,  6856.316,  7106.708,  7366.166,
+                      7635.020,  7913.614,  8202.302,  8501.454,  8811.450,
+                      9132.688,  9465.574,  9810.536, 10168.013, 10538.460,
+                      10922.351, 11320.175, 11732.438, 12159.670, 12602.412,
+                      13061.229, 13536.710, 14029.458, 14540.103, 15069.295,
+                      15617.710, 16186.049, 16775.035, 17385.420])
 
-        fc = np.array([  91.708,   115.216,   138.870,   162.702,   186.742, \
-               211.019,   235.566,   260.413,   285.593,   311.136, \
-               337.077,   363.448,   390.282,   417.614,   445.479, \
-               473.912,   502.950,   532.629,   562.988,   594.065, \
-               625.899,   658.533,   692.006,   726.362,   761.644, \
-               797.898,   835.170,   873.508,   912.959,   953.576, \
-               995.408,  1038.511,  1082.938,  1128.746,  1175.995, \
-              1224.744,  1275.055,  1326.992,  1380.623,  1436.014, \
-              1493.237,  1552.366,  1613.474,  1676.641,  1741.946, \
-              1809.474,  1879.310,  1951.543,  2026.266,  2103.573, \
-              2183.564,  2266.340,  2352.008,  2440.675,  2532.456, \
-              2627.468,  2725.832,  2827.672,  2933.120,  3042.309, \
-              3155.379,  3272.475,  3393.745,  3519.344,  3649.432, \
-              3784.176,  3923.748,  4068.324,  4218.090,  4373.237, \
-              4533.963,  4700.473,  4872.978,  5051.700,  5236.866, \
-              5428.712,  5627.484,  5833.434,  6046.825,  6267.931, \
-              6497.031,  6734.420,  6980.399,  7235.284,  7499.397, \
-              7773.077,  8056.673,  8350.547,  8655.072,  8970.639, \
-              9297.648,  9636.520,  9987.683, 10351.586, 10728.695, \
-             11119.490, 11524.470, 11944.149, 12379.066, 12829.775, \
-             13294.850, 13780.887, 14282.503, 14802.338, 15341.057, \
-             15899.345, 16477.914, 17077.504, 17690.045 ])
+        fc = np.array([91.708,   115.216,   138.870,   162.702,   186.742,
+                       211.019,   235.566,   260.413,   285.593,   311.136,
+                       337.077,   363.448,   390.282,   417.614,   445.479,
+                       473.912,   502.950,   532.629,   562.988,   594.065,
+                       625.899,   658.533,   692.006,   726.362,   761.644,
+                       797.898,   835.170,   873.508,   912.959,   953.576,
+                       995.408,  1038.511,  1082.938,  1128.746,  1175.995,
+                      1224.744,  1275.055,  1326.992,  1380.623,  1436.014,
+                      1493.237,  1552.366,  1613.474,  1676.641,  1741.946,
+                      1809.474,  1879.310,  1951.543,  2026.266,  2103.573,
+                      2183.564,  2266.340,  2352.008,  2440.675,  2532.456,
+                      2627.468,  2725.832,  2827.672,  2933.120,  3042.309,
+                      3155.379,  3272.475,  3393.745,  3519.344,  3649.432,
+                      3784.176,  3923.748,  4068.324,  4218.090,  4373.237,
+                      4533.963,  4700.473,  4872.978,  5051.700,  5236.866,
+                      5428.712,  5627.484,  5833.434,  6046.825,  6267.931,
+                      6497.031,  6734.420,  6980.399,  7235.284,  7499.397,
+                      7773.077,  8056.673,  8350.547,  8655.072,  8970.639,
+                      9297.648,  9636.520,  9987.683, 10351.586, 10728.695,
+                      11119.490, 11524.470, 11944.149, 12379.066, 12829.775,
+                      13294.850, 13780.887, 14282.503, 14802.338, 15341.057,
+                      15899.345, 16477.914, 17077.504, 17690.045])
 
-        fu = np.array([ 103.445,   127.023,   150.762,   174.694,   198.849, \
-               223.257,   247.950,   272.959,   298.317,   324.055, \
-               350.207,   376.805,   403.884,   431.478,   459.622, \
-               488.353,   517.707,   547.721,   578.434,   609.885, \
-               642.114,   675.161,   709.071,   743.884,   779.647, \
-               816.404,   854.203,   893.091,   933.113,   974.336, \
-              1016.797,  1060.555,  1105.666,  1152.187,  1200.178, \
-              1249.700,  1300.816,  1353.592,  1408.094,  1464.392, \
-              1522.559,  1582.668,  1644.795,  1709.021,  1775.427, \
-              1844.098,  1915.121,  1988.587,  2064.590,  2143.227, \
-              2224.597,  2308.806,  2395.959,  2486.169,  2579.551, \
-              2676.223,  2776.309,  2879.937,  2987.238,  3098.350, \
-              3213.415,  3332.579,  3455.993,  3583.817,  3716.212, \
-              3853.348,  3995.399,  4142.547,  4294.979,  4452.890, \
-              4643.482,  4785.962,  4961.548,  5143.463,  5331.939, \
-              5527.217,  5729.545,  5939.183,  6156.396,  6381.463, \
-              6614.671,  6856.316,  7106.708,  7366.166,  7635.020, \
-              7913.614,  8202.302,  8501.454,  8811.450,  9132.688, \
-              9465.574,  9810.536, 10168.013, 10538.460, 10922.351, \
-             11320.175, 11732.438, 12159.670, 12602.412, 13061.229, \
-             13536.710, 14029.458, 14540.103, 15069.295, 15617.710, \
-             16186.049, 16775.035, 17385.420, 18000.000 ])
+        fu = np.array([103.445,   127.023,   150.762,   174.694,   198.849,
+                       223.257,   247.950,   272.959,   298.317,   324.055,
+                       350.207,   376.805,   403.884,   431.478,   459.622,
+                       488.353,   517.707,   547.721,   578.434,   609.885,
+                       642.114,   675.161,   709.071,   743.884,   779.647,
+                       816.404,   854.203,   893.091,   933.113,   974.336,
+                      1016.797,  1060.555,  1105.666,  1152.187,  1200.178,
+                      1249.700,  1300.816,  1353.592,  1408.094,  1464.392,
+                      1522.559,  1582.668,  1644.795,  1709.021,  1775.427,
+                      1844.098,  1915.121,  1988.587,  2064.590,  2143.227,
+                      2224.597,  2308.806,  2395.959,  2486.169,  2579.551,
+                      2676.223,  2776.309,  2879.937,  2987.238,  3098.350,
+                      3213.415,  3332.579,  3455.993,  3583.817,  3716.212,
+                      3853.348,  3995.399,  4142.547,  4294.979,  4452.890,
+                      4643.482,  4785.962,  4961.548,  5143.463,  5331.939,
+                      5527.217,  5729.545,  5939.183,  6156.396,  6381.463,
+                      6614.671,  6856.316,  7106.708,  7366.166,  7635.020,
+                      7913.614,  8202.302,  8501.454,  8811.450,  9132.688,
+                      9465.574,  9810.536, 10168.013, 10538.460, 10922.351,
+                      11320.175, 11732.438, 12159.670, 12602.412, 13061.229,
+                      13536.710, 14029.458, 14540.103, 15069.295, 15617.710,
+                      16186.049, 16775.035, 17385.420, 18000.000])
 
         return fc, fl, fu
 
@@ -1003,7 +1002,7 @@ class PsychoacousticModel:
             Brk_spc  : (ndarray)    2D Array containing the Bark scaled magnitude spectra.
         """
         W_short = self.W[:, 0:self.nfreqs]
-        Brk_spc = np.dot(W_short,spc)
+        Brk_spc = np.dot(W_short, spc)
         return Brk_spc
 
     def backward(self, Brk_spc):
@@ -1013,7 +1012,7 @@ class PsychoacousticModel:
         Returns      :
             Xhat     : (ndarray)    2D Array containing the reconstructed magnitude spectra.
         """
-        Xhat = np.dot(self.W_inv,Brk_spc)
+        Xhat = np.dot(self.W_inv, Brk_spc)
         return Xhat
 
     def OutMidCorrection(self, correctionType, firOrd, fs):
@@ -1024,29 +1023,27 @@ class PsychoacousticModel:
             in Proceedings of the Matlab DSP Conference, pp 96-99, Espoo, Finland 1999.
         """
         # Lookup tables for correction
-        f1 = np.array([20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, \
-        125, 150, 177, 200, 250, 300, 350, 400, 450, 500, 550, \
-        600, 700, 800, 900, 1000, 1500, 2000, 2500, 2828, 3000, \
-        3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000, 9000, 10000, \
-        12748, 15000])
+        f1 = np.array([20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100,
+                      125, 150, 177, 200, 250, 300, 350, 400, 450, 500, 550,
+                      600, 700, 800, 900, 1000, 1500, 2000, 2500, 2828, 3000,
+                      3500, 4000, 4500, 5000, 5500, 6000, 7000, 8000, 9000, 10000,
+                      12748, 15000])
 
-        ELC = np.array([ 31.8, 26.0, 21.7, 18.8, 17.2, 15.4, 14.0, 12.6, 11.6, 10.6, \
-            9.2, 8.2, 7.7, 6.7, 5.3, 4.6, 3.9, 2.9, 2.7, 2.3, \
-            2.2, 2.3, 2.5, 2.7, 2.9, 3.4, 3.9, 3.9, 3.9, 2.7, \
-            0.9, -1.3, -2.5, -3.2, -4.4, -4.1, -2.5, -0.5, 2.0, 5.0, \
-            10.2, 15.0, 17.0, 15.5, 11.0, 22.0])
+        ELC = np.array([31.8, 26.0, 21.7, 18.8, 17.2, 15.4, 14.0, 12.6, 11.6, 10.6,
+                        9.2, 8.2, 7.7, 6.7, 5.3, 4.6, 3.9, 2.9, 2.7, 2.3,
+                        2.2, 2.3, 2.5, 2.7, 2.9, 3.4, 3.9, 3.9, 3.9, 2.7,
+                        0.9, -1.3, -2.5, -3.2, -4.4, -4.1, -2.5, -0.5, 2.0, 5.0,
+                        10.2, 15.0, 17.0, 15.5, 11.0, 22.0])
 
-        MAF = np.array([ 73.4, 65.2, 57.9, 52.7, 48.0, 45.0, 41.9, 39.3, 36.8, 33.0, \
-            29.7, 27.1, 25.0, 22.0, 18.2, 16.0, 14.0, 11.4, 9.2, 8.0, \
-             6.9,  6.2,  5.7,  5.1,  5.0,  5.0,  4.4,  4.3, 3.9, 2.7, \
-             0.9, -1.3, -2.5, -3.2, -4.4, -4.1, -2.5, -0.5, 2.0, 5.0, \
-            10.2, 15.0, 17.0, 15.5, 11.0, 22.0])
+        MAF = np.array([73.4, 65.2, 57.9, 52.7, 48.0, 45.0, 41.9, 39.3, 36.8, 33.0,
+                        29.7, 27.1, 25.0, 22.0, 18.2, 16.0, 14.0, 11.4, 9.2, 8.0,
+                        6.9,  6.2,  5.7,  5.1,  5.0,  5.0,  4.4,  4.3, 3.9, 2.7,
+                        0.9, -1.3, -2.5, -3.2, -4.4, -4.1, -2.5, -0.5, 2.0, 5.0,
+                        10.2, 15.0, 17.0, 15.5, 11.0, 22.0])
 
-        f2  = np.array([  125,  250,  500, 1000, 1500, 2000, 3000,  \
-            4000, 6000, 8000, 10000, 12000, 14000, 16000])
+        f2 = np.array([125,  250,  500, 1000, 1500, 2000, 3000, 4000, 6000, 8000, 10000, 12000, 14000, 16000])
 
-        MAP = np.array([ 30.0, 19.0, 12.0,  9.0, 11.0, 16.0, 16.0, \
-            14.0, 14.0,  9.9, 24.7, 32.7, 44.1, 63.7])
+        MAP = np.array([30.0, 19.0, 12.0,  9.0, 11.0, 16.0, 16.0, 14.0, 14.0,  9.9, 24.7, 32.7, 44.1, 63.7])
 
         if correctionType == 'ELC':
             freqTable = f1
@@ -1065,10 +1062,10 @@ class PsychoacousticModel:
         freqN = np.arange(0, firOrd) * fs/2. / (firOrd-1)
         spline = uspline(freqTable, CorrectionTable)
         crc = spline(freqN)
-        crclin = 10. ** (-crc/ 10.)
+        crclin = 10. ** (-crc / 10.)
         return crclin, freqN, crc
 
-    def MOEar(self, correctionType = 'ELC'):
+    def MOEar(self, correctionType='ELC'):
         """ Method to approximate middle-outer ear transfer function for linearly scaled
             frequency representations, using an FIR approximation of order 600 taps.
             As appears in :
@@ -1088,7 +1085,7 @@ class PsychoacousticModel:
         Cr[self.nfft - 1] = 0.
 
         # FIR Design
-        A = firwin2(firOrd, fr, Cr, nyq = self.fs/2)
+        A = firwin2(firOrd, fr, Cr, nyq=self.fs/2)
         B = 1
         _, LTq = freqz(A, B, firOrd, self.fs)
 
@@ -1129,8 +1126,8 @@ class PsychoacousticModel:
         # Initialization of the matrix containing the masking threshold
         maskingThreshold = np.zeros((timeFrames, Numsubbands))
 
-        for frameindx in xrange(mX.shape[0]) :
-            mT = np.zeros((Numsubbands))
+        for frameindx in xrange(mX.shape[0]):
+            mT = np.zeros(Numsubbands)
             for n in xrange(Numsubbands):
                 for m in xrange(0, n):
                     mT[n] += (mX[frameindx, m] * self._fa * (self._fb ** ((n - m) * fc))) ** self._alpha
@@ -1138,7 +1135,7 @@ class PsychoacousticModel:
                 for m in xrange(n+1, Numsubbands):
                     mT[n] += (mX[frameindx, m] * self._fa * (self._fbb ** ((m - n) * fc))) ** self._alpha
 
-                mT[n] = mT[n] ** (self._fd)
+                mT[n] = mT[n] ** self._fd
 
             maskingThreshold[frameindx, :] = mT
 
@@ -1186,6 +1183,7 @@ class PsychoacousticModel:
 
         print(NMR)
         return NMR
+
 
 class WDODisjointness:
     """ A Class that measures the disjointness of a Time-frequency decomposition
@@ -1289,6 +1287,7 @@ class WDODisjointness:
                 GI[frame] = (1./len(sortedVector) + 1. - 2.* np.sum(cgi))
 
         return GI
+
 
 if __name__ == "__main__":
     import IOMethods as IO
